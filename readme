@@ -1,0 +1,93 @@
+Animated
+支持动画效果的组件Image, Text, View;
+1.一个RN的动画，可以按照以下步骤进行。
+1.1使用基本的Animated组件，如Animated.View Animated.Image Animated.Text （重要！不加Animated的后果就是一个看不懂的报错，然后查半天
+动画参数，最后怀疑人生）
+1.2使用Animated.Value设定一个或多个初始化值（透明度，位置等等）。
+1.3将初始化值绑定到动画目标的属性上（如style）
+1.4通过Animated.timing等函数设定动画参数
+1.5调用start启动动画。
+
+2.1.Animated核心API(Core API)
+我在使用动画的时候大部分需要使用的模块方法都来自Animated模块，该包括两个值类型:①.Value代表单一值,ValueXY代表向量值。②.三个动画类型:
+spring,decay和timing。③.三个组件类型:View,Text和Image，并且另外通过Animated.createAnimatedComponent自定义创建的动画组件。
+通过这三种动画类型我们几乎可以创建任何需要的动画效果:
+2.1.1.spring:该为弹跳类型的动画
+①.friction:  bounciness值,摩擦力值  默认为7
+②.tension:  弹跳的速度值  默认为40
+2.1.2.decay:带有加速度值的动画，类似于正弦值
+①.velocity:初始速度,必须要填写
+②.deceleration:速度减小的比例，加速度。默认为0.997
+2.1.3.timing:带有时间的渐变动画
+①.duration:设置动画持续的时间(单位为毫秒),默认为500ms
+②.easing:动画效果的函数，大家可以查看Easing模块查询更多的预定义的函数。iOS平台的默认动画为Easing.inOut(Easing.ease)
+③.delay: 动画执行延迟时间(单位:毫秒).默认为0ms
+动画通过调用start方法开始执行，start方法可以设置一个回调方法，当动画执行完毕会进行调用该方法。如果动画是正常播放完毕的，那么该回调方法会被
+执行并且传入参数{finished:true}。但是如果动画是在正常播放完毕之前调用了stop来进行停止的话，那么该会回调传入{finished:false}。
+2.2.组合动画(Composing Animations)
+如果我们有多个动画，那么可以进行使用单个动画组合起来进行执行。具体可以通过parallel(同时执行),sequence(顺序执行),以及stagger和delay来进
+行组合使用动画。这个几个类型都可以传入一个需要执行的动画的数组，然后自动start/stop来进行开始动画或者停止动画。具体可以看一下官方的例子:
+Animated.sequence([            // 首先执行decay动画，然后通知执行spring和twirl动画
+  Animated.decay(position, {   // coast to a stop
+    velocity: {x: gestureState.vx, y: gestureState.vy}, //通过手势设置相关速度
+    deceleration: 0.997,
+  }),
+  Animated.parallel([          // 在decay动画执行完成以后，同时执行如下动画
+    Animated.spring(position, {
+      toValue: {x: 0, y: 0}    // return to start
+    }),
+    Animated.timing(twirl, {   // and twirl
+      toValue: 360,
+    }),
+  ]),
+]).start();                    //开启执行这顺序动画
+默认情况下,如果一个动画被停止或者中断了，那么在该组合动画中的其他动画也停止了。不过Parallel同时执行动画中有一个stopTogether可选属性，如果
+设置这个属性为false的话，那么就可以禁止自动停止啦。
+2.3.插值动画(interpolate)
+Animated库API还提供一个非常强大的功能是interpolate插值动画效果。该允许一个输入的区间范围映射到另外一个输入的区间范围。例如:一个简单的实例
+0-1的区间映射到0-100的区间范围:
+value.interpolate({
+  inputRange: [0, 1],
+  outputRange: [0, 100],
+});
+interpolate还支持多段区间，该用来定义一些静态区间。例如:当我们输入为-300的时候取值相反值。然后在输入到-100的时候变成0，当输入接着0 的时候
+变成1，接着输入一直到100的时候又回到0。最终形成 的静态区间就为0。大于任何大于100的输入都返回0.具体事例如下:
+value.interpolate({
+  inputRange: [-300, -100, 0, 100, 101],
+  outputRange: [300,    0, 1,   0,   0],
+});
+类似的映射例子如下:
+value.interpolate({
+  inputRange: [-400, -300, -200, -100, -50,0,50,100,101,200],
+  outputRange: [450,    300, 150,  0,   0.5,1,0.5,0,0,0],
+});
+interpolation还支持任意形式的渐变方法，很多类型已经Easing类中定义了，例如:二次函数,指数函数,贝塞尔曲线等step以及bounce。interpolation
+还可以设置区间outputRnage的输出值边界。可以设置extrapolate,extrapolateLeft或者extraplateRight可选属性。默认值为extend(允许超出),但
+是我们可以设置clamp属性来避免值超出outputRange的最大边界值
+2.4.追踪动态值(Tracking Dynamic Values)
+在设置的动画中所设定的值可以通过追踪别的值进行获取到。我们只需要不设置toValue为一个普通固定的数组就可以了。例如我们想实现聊天头像的闪动的效
+果。又例如我们需要timing动画快速的在后面实现。
+Animated.spring(follower, {toValue: leader}).start();
+Animated.timing(opacity, {
+  toValue: pan.x.interpolate({
+    inputRange: [0, 300],
+    outputRange: [1, 0],
+  }),
+}).start();
+ValueXY是可以非常方便的处理2D交互，例如旋转或者拖拽动画。该ValueXY是简单的封装了两个Animated.Value实例以及一些可以去调用的方法。在很多
+情况下，我们可以使用ValueXY替换Value进行使用。上面的例子中，leader和follower都可以同时为ValueXY类型，这样x和y的值我们都可以获取到了。
+2.5.输入事件(Input Events)
+Animated.event在Animated API中和手势输入模块相关。该允许手势事件以及其他事件操作。该通过一个结构化得数组进行拆分显示复杂的事件对象。该方
+法参数是一个数组可以映射输入多个事件的对象。我们来看下面的一个例子:我们把event.nativeEvent.contentOffset.x的值赋值到scrollX变量中
+(event一般为回调方法的第一个参数)。同时取出手势状态的gestureState.dx和gestureState.dy的值赋值到pan.x何pan.y变量中(gestureState通常
+为PanResponder回调方法中的第二个参数)。来我们看代码示例:
+onScroll={Animated.event(
+  // 设置scrollX = e.nativeEvent.contentOffset.x
+  [{nativeEvent: {contentOffset: {x: scrollX}}}]
+)}
+onPanResponderMove={Animated.event([
+  null,                                          // 忽略原生事件
+  // 从gestureState中取出dx和dy的值
+  // like 'pan.x = gestureState.dx, pan.y = gestureState.dy'
+  {dx: pan.x, dy: pan.y}
+]);
